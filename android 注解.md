@@ -112,21 +112,21 @@ Java编译器的相关代码在openjdk-6-src-b27-26_oct_2012/langtools/src/share
   -J<标记>                     直接将 <标记> 传递给运行时系统
   -Werror                    出现警告时终止编译
   @<文件名>                     从文件读取选项和文件名
-  ```
+```
 
  Java编译器在运行时会收集注解，并对外提供处理注释的接口，如javac -processorpath <路径> 。如果我们是以命令行的形式编译java文件，可以用命令行指定注解处理的地方。但多数时候我们会习惯使用IDEA开发工具来工作，比如Android studio。
 Android Studio用Gradle构建工具来完成依赖管理，编译，打包等工作，因此，如果我们要指定注解处理器，就不能用命令行的形式来指定。
 Android Studio中添加注解处理器，在gradle 3.0.0版本之前用 android-apt插件形式，在gradle 3.0.0以及之后的高版本中，用annotationProcessor来指定注解处理器。
 [参见android studio官网的介绍](https://developer.android.google.cn/studio/build/dependencies#annotation_processor)
 
-  ```
+```
   dependencies {
     // Adds libraries defining annotations to only the compile classpath.
     compileOnly 'com.google.dagger:dagger:version-number'
     // Adds the annotation processor dependency to the annotation processor classpath.
     annotationProcessor 'com.google.dagger:dagger-compiler:version-number'
 }
-  ```
+```
 以上annotationProcessor指定了由com.google.dagger插件来处理注释。当然，这里我们可以设置任何能处理注释的三方插件或者自定义module来处理。
 一般我们项目中有很多个android module，如果多个module都需要收集自定义注释并指定注释处理器，那这些module都必须要要设置annotationProcessor。
 
@@ -136,7 +136,7 @@ application和android library依赖于android sdk，android sdk中包含了andro
 
 注解处理器其实就是java编译器给javac -processorpath <路径> 所在的实现类的一个回调处理。至于java编译器是如何收集注解，如何回调的，还得详细研究编译器的相关源码。这里只关注如何处理自定义注解，如下：
 
-  ```
+```
   public class JavaAnnotationProcessor extends AbstractProcessor {
 
     private Filer mFiler; //文件相关的辅助类
@@ -203,7 +203,7 @@ application和android library依赖于android sdk，android sdk中包含了andro
         return false;
     }
 }
-  ```
+```
 以上是注释处理器的实现类，需要注意的有两点：
 一是在getSupportedAnnotationTypes()中添加需要在这里进行处理的特定注释。
 二是在process()中处理注释。注释的处理有两个步骤：解析注释所在的java建模元素标签，利用JavaPoet生成java代码。
@@ -211,7 +211,7 @@ application和android library依赖于android sdk，android sdk中包含了andro
 JDK在处理注释的时候，把java类建模成html标签类的样子，并提供了相关的接口处理。参见[JDK中java compiler模块](https://www.apiref.com/java11-zh/index.html)中Package javax.lang.model.element
 
 其元素标签类似于如下结构：
-  ```
+```
 <PackageElement>//包
     <TypeElement>//类，接口
         <TypeParameterElement></TypeParameterElement>//类，接口的泛型参数
@@ -222,7 +222,7 @@ JDK在处理注释的时候，把java类建模成html标签类的样子，并提
         </ExecutableElement>
     </TypeElement>
 </PackageElement>
-  ```
+```
 通过JDK的回调方法process()中提供的RoundEnvironment来操作此元素标签结构。
 RoundEnvironment的getElementsAnnotatedWith()可获取当前注释所在的Element。
 如果当前注释所在的位置为类，则返回TypeElement，如果注释所在的位置为函数，则返回ExecutableElement，依次类推。
@@ -236,7 +236,7 @@ JavaPoet用于生成java代码，详细用法参见github的官网说明，使�
 比如，实现android中的findViewById()功能：
 
 一.定义接口：
-  ```
+```
 public interface IProxy<T> {
     /**
      *
@@ -245,9 +245,9 @@ public interface IProxy<T> {
      */
     public void inject(final T target, View root);
 }
-  ```
+```
 二.通过反射机制获取注释处理生成的代理类的对象，并调用这个代理类的方法实现findViewById()功能
-  ```
+```
   public class IProxyUtil {
     //生成代理类的后缀名
     public static final String SUFFIX = "$Proxy";
@@ -283,10 +283,10 @@ public interface IProxy<T> {
     }
 
 }
-  ```
+```
 三. 通过注释处理器生成代理类
 
-  ```
+```
       @Override
     public boolean process(Set<? extends TypeElement> set, RoundEnvironment roundEnvironment) {
         mMessager.printMessage(Diagnostic.Kind.WARNING,"process:");
@@ -360,12 +360,12 @@ public interface IProxy<T> {
         }
 
     }
-  ```
+```
 
 四.查看注释处理器生成的代理类文件
 注释处理器的代码写好后，重新Rebuild Project就可以，生成的代理类文件一般在build/generated/ap_generated_sources/debug/out下面，或者在build/outputs下面。
 AnnotationProject/app/build/generated/ap_generated_sources/debug/out/com/example/annotationproject/MainActivityViewFind$Proxy.java
-  ```
+```
   package com.example.annotationproject;
 
 import android.view.View;
@@ -379,7 +379,7 @@ public class MainActivityViewFind$Proxy implements IProxy<MainActivity> {
     target.age= root.findViewById(2131230788);
   }
 }
-  ```
+```
 
 ## android中注释相关的三方框架 ##
 
@@ -392,13 +392,13 @@ EventBus在3.0版本的时候加入了注释处理器的功能，用户可以自
 详细见[官网介绍](https://greenrobot.org/eventbus/documentation/subscriber-index/)
 
 我们看下官网介绍的build.gradle配置：
-  ```
+```
   dependencies {
     def eventbus_version = '3.2.0'
     implementation "org.greenrobot:eventbus:$eventbus_version"
     annotationProcessor "org.greenrobot:eventbus-annotation-processor:$eventbus_version"
 }
-  ```
+```
 注释处理器指定为org.greenrobot:eventbus-annotation-processor。我们把[EventBus3.0源码](https://github.com/greenrobot/EventBus)下载下来看看它的注释处理器eventbus-annotation-processor。
 
 EventBus3.0源码的目录有6个module，除了主要的EventBus，EventBusAnnotationProcessor两个module外，剩下的四个module（EventBusPerformance，EventBusTest，EventBusTestJava，EventBusTestSubscriberInJar）都是测试用。
@@ -407,7 +407,7 @@ EventBus module中
 
 
 EventBusAnnotationProcessor module依赖于EventBus module，打包名称为eventbus-annotation-processor，版本是3.2.0。
-  ```
+```
   apply plugin: 'java'
 
 archivesBaseName = 'eventbus-annotation-processor'
@@ -425,18 +425,17 @@ dependencies {
     compileOnly "net.ltgt.gradle.incap:incap:$incap"
     annotationProcessor "net.ltgt.gradle.incap:incap-processor:$incap"
 }
-......
-  ```
+```
 
 此外，EventBusAnnotationProcessor module中的注释处理交给net.ltgt.gradle.incap:incap-processor:$incap来完成。EventBusAnnotationProcessor本来就是一个注释处理器，为什么它还自己还定义另外一个注释处理器来处理自己的注释。  
 我们查看EventBusAnnotationProcessor module中唯一的类EventBusAnnotationProcessor.java。可以看到类注释@IncrementalAnnotationProcessor(AGGREGATING)，这个注释的处理在net.ltgt.gradle.incap:incap-processor:$incap中，这个注释有什么用？现在暂时没看明白，后续有空再回来看看。
 
-  ```
-  @SupportedAnnotationTypes("org.greenrobot.eventbus.Subscribe")
+```
+@SupportedAnnotationTypes("org.greenrobot.eventbus.Subscribe")
 @SupportedOptions(value = {"eventBusIndex", "verbose"})
 @IncrementalAnnotationProcessor(AGGREGATING)
 public class EventBusAnnotationProcessor extends AbstractProcessor {
 ......
 }
-  ```
+```
 EventBusAnnotationProcessor module中的process()过程主要是把收集的

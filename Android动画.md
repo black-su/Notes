@@ -64,7 +64,7 @@ public class AccelerateDecelerateInterpolator extends BaseInterpolator
 }
 ```
 
-动画的评估程序：TypeEvaluator（这个TypeEvaluator我理解为动画在屏幕上绘制的每一帧的属性值计算，通过跟踪getAnimatedValue()源码实现的流程，在FloatKeyframeSet.java中发现getAnimatedValue的值是由动画速率和当前进度计算而来。理论上动画的速率也可以在这里设置，动画的每一帧的属性设置都来自这里）
+动画的评估程序（估值器）：TypeEvaluator（这个TypeEvaluator我理解为动画在屏幕上绘制的每一帧的属性值计算，可以查看FloatKeyframeSet.getAnimatedValue()源码实现的流程，每一帧的属性值来跟动画有关。TypeEvaluator和TimeInterpolator分开设计的原因是：TimeInterpolator单独设置动画速率，我们可以通过调用TypeEvaluator.evaluate(float fraction, Number startValue, Number endValue)，在不同的动画阶段（startValue ～ endValue），执行不同的速率（fraction），这样达到一个动画事件内实现多种不同的动画路径效果。
 
 ```
     @Override
@@ -686,6 +686,138 @@ imageView.startAnimation(animationSet);
  
 
 
+视图动画实现原理：
+
+```
+AlphaAnimation alphaAnimation = new AlphaAnimation(0,1);
+alphaAnimation.setDuration(2000);
+alphaAnimation.setFillAfter(false);
+imageView.startAnimation(alphaAnimation);
+```
+
+View.java
+```
+    public void startAnimation(Animation animation) {
+        animation.setStartTime(Animation.START_ON_FIRST_FRAME);
+        setAnimation(animation);//给View设置动画
+        invalidateParentCaches();
+        invalidate(true);//刷新View，会调用draw()。
+    }
+    public void setAnimation(Animation animation) {
+        mCurrentAnimation = animation;
+
+        if (animation != null) {
+            // If the screen is off assume the animation start time is now instead of
+            // the next frame we draw. Keeping the START_ON_FIRST_FRAME start time
+            // would cause the animation to start when the screen turns back on
+            if (mAttachInfo != null && mAttachInfo.mDisplayState == Display.STATE_OFF
+                    && animation.getStartTime() == Animation.START_ON_FIRST_FRAME) {
+                animation.setStartTime(AnimationUtils.currentAnimationTimeMillis());
+            }
+            animation.reset();
+        }
+    }
+    boolean draw(Canvas canvas, ViewGroup parent, long drawingTime) {
+        ......
+        Transformation transformToApply = null;
+        boolean concatMatrix = false;
+        final boolean scalingRequired = mAttachInfo != null && mAttachInfo.mScalingRequired;
+        final Animation a = getAnimation();
+        if (a != null) {
+            //修改view中的Matrix矩阵信息
+            more = applyLegacyAnimation(parent, drawingTime, a, scalingRequired);
+            concatMatrix = a.willChangeTransformationMatrix();
+            if (concatMatrix) {
+                mPrivateFlags3 |= PFLAG3_VIEW_IS_ANIMATING_TRANSFORM;
+            }
+            //Transformation中有Matrix矩阵信息，通过修改矩阵达到对view进行动画的目的
+            transformToApply = parent.getChildTransformation();
+        }
+        //后续有使用transformToApply中的Matrix矩阵来进行动画，详见后续代码
+        ......
+    }
+    private boolean applyLegacyAnimation(ViewGroup parent, long drawingTime,
+            Animation a, boolean scalingRequired) {
+        Transformation invalidationTransform;
+        final int flags = parent.mGroupFlags;
+        final boolean initialized = a.isInitialized();
+        if (!initialized) {
+            a.initialize(mRight - mLeft, mBottom - mTop, parent.getWidth(), parent.getHeight());
+            a.initializeInvalidateRegion(0, 0, mRight - mLeft, mBottom - mTop);
+            if (mAttachInfo != null) a.setListenerHandler(mAttachInfo.mHandler);
+            onAnimationStart();
+        }
+
+        final Transformation t = parent.getChildTransformation();
+        //获取Transformation对象并设置Transformation中的属性值
+        boolean more = a.getTransformation(drawingTime, t, 1f);
+        if (scalingRequired && mAttachInfo.mApplicationScale != 1f) {
+            if (parent.mInvalidationTransformation == null) {
+                parent.mInvalidationTransformation = new Transformation();
+            }
+            invalidationTransform = parent.mInvalidationTransformation;
+            a.getTransformation(drawingTime, invalidationTransform, 1f);
+        } else {
+            invalidationTransform = t;
+        }
+        ......
+    }
+```
+
+Animation.java
+```
+    public boolean getTransformation(long currentTime, Transformation outTransformation,
+            float scale) {
+        mScaleFactor = scale;
+        return getTransformation(currentTime, outTransformation);
+    }
+
+    public boolean getTransformation(long currentTime, Transformation outTransformation) {
+        .......
+        if ((normalizedTime >= 0.0f || mFillBefore) && (normalizedTime <= 1.0f || mFillAfter)) {
+            if (!mStarted) {
+                fireAnimationStart();
+                mStarted = true;
+                if (NoImagePreloadHolder.USE_CLOSEGUARD) {
+                    guard.open("cancel or detach or getTransformation");
+                }
+            }
+
+            if (mFillEnabled) normalizedTime = Math.max(Math.min(normalizedTime, 1.0f), 0.0f);
+
+            if (mCycleFlip) {
+                normalizedTime = 1.0f - normalizedTime;
+            }
+
+            final float interpolatedTime = mInterpolator.getInterpolation(normalizedTime);
+            applyTransformation(interpolatedTime, outTransformation);
+        }
+        ......
+    }
+    //applyTransformation是一个空方法，主要实现在AlphaAnimation，RotateAnimation，TranslateAnimation，ScaleAnimation中
+    protected void applyTransformation(float interpolatedTime, Transformation t) {
+    }
+```
+
+TranslateAnimation.java
+```
+    protected void applyTransformation(float interpolatedTime, Transformation t) {
+        float dx = mFromXDelta;
+        float dy = mFromYDelta;
+        if (mFromXDelta != mToXDelta) {
+            dx = mFromXDelta + ((mToXDelta - mFromXDelta) * interpolatedTime);
+        }
+        if (mFromYDelta != mToYDelta) {
+            dy = mFromYDelta + ((mToYDelta - mFromYDelta) * interpolatedTime);
+        }
+        t.getMatrix().setTranslate(dx, dy);
+    }
+```
+
+AlphaAnimation，RotateAnimation，TranslateAnimation，ScaleAnimation实现的applyTransformation()方法中都是以线性的速率来实现动画的效果？？？？？？？？，基本上是通过对view的Matrix矩阵操作。如果使用视图动画，但是又要求实现不同的速率，那就需要自定义Animation并实现applyTransformation()方法，在applyTransformation()方法中提供不同速率下的动画值，再通过Matrix实现动画效果。当然，更加复杂一点的动画，比如一个动画时间内，实现多个不同动画速率的效果，也是可以实现的，interpolatedTime是动画进度(0~1),根据进度的不同，设置不动的速率即可。可以参考属性动画的插值器和估值器来实现。
 
 
 
+属性动画的原理：
+
+https://blog.csdn.net/mg2flyingff/article/details/112726656

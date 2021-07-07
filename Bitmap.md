@@ -88,7 +88,7 @@ Bitmap的创建需要向jvm申请内存，如果图片大太，或者有多个�
 
 Bitmap所需的内存大小和图片的分辨率，图片所在位置，Bitmap加载方式都有关，具体的可以查看：
 
-https://www.cnblogs.com/dasusu/
+https://www.cnblogs.com/dasusu/p/9789389.html
 
 减轻Bitmap所占内存有两种方式：
 一是把图片的像素大小调小一点，这会导致图片质量变差。(ALPHA_8,ARGB_4444,ARGB_8888,RGB_565)
@@ -248,3 +248,10 @@ https://blog.csdn.net/guolin_blog/article/details/28863651
 Glide中的图片缓存源码分析，待研究.......
 
 https://blog.csdn.net/guolin_blog/article/details/53759439
+
+
+使用Bitmap注意事项：
+
+1.及时调用recycle()回收Bitmap的内存
+2.避免oom，使用LruCache，且手动压缩图片，使用try catch避免OutOfMemoryError错误导致的应用崩溃。使用try catch的时候需要注意，这个时候只是避免了应用崩溃，但是已申请的内存还是被占用的，应该想办法释放内存。
+3.缓存复用Bitmap

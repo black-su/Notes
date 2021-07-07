@@ -1,6 +1,9 @@
 # HashMap 与 LinkedHashMap 源码分析
 
 
+https://blog.csdn.net/weixin_52801742/article/details/114252312
+
+
 HashMap的Node节点类：
 
 ```
@@ -21,21 +24,23 @@ HashMap中定义了一个Node数组，用来保存数据，Node数组的创建�
 
     final Node<K,V>[] resize() {
         Node<K,V>[] oldTab = table;
-        int oldCap = (oldTab == null) ? 0 : oldTab.length;
-        int oldThr = threshold;
+        int oldCap = (oldTab == null) ? 0 : oldTab.length;//HashMap的容量
+        int oldThr = threshold;//触发扩容需要达到的阀值
         int newCap, newThr = 0;
         if (oldCap > 0) {
-            if (oldCap >= MAXIMUM_CAPACITY) {
+            if (oldCap >= MAXIMUM_CAPACITY) {//HashMap容量已经达到最大值，不再扩容
                 threshold = Integer.MAX_VALUE;
                 return oldTab;
             }
             else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
                      oldCap >= DEFAULT_INITIAL_CAPACITY)
+                //每次扩容都是2的次幂，也就是两倍扩容。
                 newThr = oldThr << 1; // double threshold
         }
         else if (oldThr > 0) // initial capacity was placed in threshold
-            newCap = oldThr;
+            newCap = oldThr;//初始化时手动设置了HashMap容量
         else {               // zero initial threshold signifies using defaults
+            //初始化时没有设置容量，默认容量为16，扩容阀值为16*0.75=12。
             newCap = DEFAULT_INITIAL_CAPACITY;
             newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
         }
@@ -80,7 +85,8 @@ HashMap中定义了一个Node数组，用来保存数据，Node数组的创建�
                     if ((e = p.next) == null) {
                         p.next = newNode(hash, key, value, null);
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
-                            treeifyBin(tab, hash);//是否要转换成树节点
+                            //单链表个数达到7个时，把单链表结构转成红黑树
+                            treeifyBin(tab, hash);
                         break;
                     }
                     if (e.hash == hash &&
